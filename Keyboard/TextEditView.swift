@@ -1,0 +1,121 @@
+import UIKit
+
+enum EditAction {
+    case left, right, up, down
+    case home, end
+    case backspace
+    case copy, paste
+    case select, selectAll
+    case close
+}
+
+/// Cursor pad that replaces the key grid (Gboard "Text editing").
+final class TextEditView: UIView {
+    var onAction: ((EditAction) -> Void)?
+
+    private var buttons: [(EditAction, UIButton)] = []
+    private let titleLabel = UILabel()
+    private let backButton = UIButton(type: .system)
+    private var repeatTimer: Timer?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = Theme.background
+
+        backButton.setImage(UIImage(systemName: "arrow.left"), for: .normal)
+        backButton.tintColor = Theme.text
+        backButton.backgroundColor = Theme.fill(.special, pressed: false)
+        backButton.layer.cornerRadius = 17
+        backButton.addAction(UIAction { [weak self] _ in self?.onAction?(.close) }, for: .touchUpInside)
+        addSubview(backButton)
+
+        titleLabel.text = "Text editing"
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = Theme.text
+        addSubview(titleLabel)
+
+        let defs: [(EditAction, String, Bool)] = [
+            (.left, "chevron.left", true), (.up, "chevron.up", true), (.select, "Select", false),
+            (.down, "chevron.down", true), (.right, "chevron.right", true),
+            (.selectAll, "Select all", false), (.copy, "Copy", true), (.paste, "Paste", true),
+            (.home, "arrow.left.to.line", true), (.end, "arrow.right.to.line", true),
+            (.backspace, "delete.left", true)
+        ]
+        for (action, label, enabled) in defs {
+            let b = UIButton(type: .system)
+            if UIImage(systemName: label) != nil {
+                b.setImage(UIImage(systemName: label), for: .normal)
+            } else {
+                b.setTitle(label, for: .normal)
+                b.titleLabel?.font = .systemFont(ofSize: 14)
+            }
+            b.tintColor = Theme.hint
+            b.setTitleColor(enabled ? Theme.text : Theme.hint, for: .normal)
+            b.backgroundColor = Theme.fill(enabled ? .normal : .special, pressed: false)
+            b.layer.cornerRadius = 8
+            b.alpha = enabled ? 1 : 0.55
+            if action == .left || action == .right || action == .up || action == .down || action == .backspace {
+                b.addTarget(self, action: #selector(repeatDown(_:)), for: .touchDown)
+                b.addTarget(self, action: #selector(repeatUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+            } else {
+                b.addAction(UIAction { [weak self] _ in self?.onAction?(action) }, for: .touchUpInside)
+            }
+            addSubview(b)
+            buttons.append((action, b))
+        }
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func action(for b: UIButton) -> EditAction? { buttons.first { $0.1 === b }?.0 }
+
+    @objc private func repeatDown(_ b: UIButton) {
+        guard let a = action(for: b) else { return }
+        onAction?(a)
+        repeatTimer?.invalidate()
+        repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
+            self?.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.06, repeats: true) { [weak self] _ in
+                self?.onAction?(a)
+            }
+        }
+    }
+
+    @objc private func repeatUp() {
+        repeatTimer?.invalidate()
+        repeatTimer = nil
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let w = bounds.width, pad: CGFloat = 6
+        backButton.frame = CGRect(x: 8, y: 6, width: 34, height: 34)
+        titleLabel.frame = CGRect(x: 52, y: 6, width: w - 60, height: 34)
+
+        let top: CGFloat = 50
+        let bottom: CGFloat = 6
+        let area = CGRect(x: pad, y: top, width: w - 2 * pad, height: bounds.height - top - bottom)
+        let colW = (area.width - 3 * pad) / 4           // 4 columns
+
+        // 4 rows of equal height: Up / Select / Down stack in the middle column,
+        // Left and Right are tall buttons beside them (like the Gboard reference).
+        let rows: CGFloat = 4
+        let h = (area.height - (rows - 1) * pad) / rows
+        func rect(_ c: CGFloat, _ r: CGFloat, cols: CGFloat = 1, rows rs: CGFloat = 1) -> CGRect {
+            CGRect(x: area.minX + c * (colW + pad), y: area.minY + r * (h + pad),
+                   width: colW * cols + pad * (cols - 1), height: h * rs + pad * (rs - 1))
+        }
+        let place: [EditAction: CGRect] = [
+            .left: rect(0, 0, rows: 3),
+            .up: rect(1, 0),
+            .select: rect(1, 1),
+            .down: rect(1, 2),
+            .right: rect(2, 0, rows: 3),
+            .selectAll: rect(3, 0),
+            .copy: rect(3, 1),
+            .paste: rect(3, 2),
+            .home: rect(0, 3, cols: 2),
+            .end: rect(2, 3),
+            .backspace: rect(3, 3)
+        ]
+        for (a, b) in buttons { if let r = place[a] { b.frame = r } }
+    }
+}

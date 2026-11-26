@@ -1,0 +1,69 @@
+name: BruninBoard
+options:
+  bundleIdPrefix: io.brunintech
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGN_IDENTITY: ""
+targets:
+  BruninBoard:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: BruninBoard
+        UILaunchScreen: {}
+        CFBundleURLTypes:
+          - CFBundleURLName: io.brunintech.bruninboard
+            CFBundleURLSchemes:
+              - bruninboard
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    entitlements:
+      path: App/BruninBoard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.io.brunintech.bruninboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.brunintech.bruninboard
+    dependencies:
+      - target: BruninBoardKeyboard
+        embed: true
+  BruninBoardKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Keyboard
+      - Shared
+    info:
+      path: Keyboard/Info.plist
+      properties:
+        CFBundleDisplayName: BruninBoard
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            RequestsOpenAccess: true
+    entitlements:
+      path: Keyboard/BruninBoardKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.io.brunintech.bruninboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.brunintech.bruninboard.keyboard
