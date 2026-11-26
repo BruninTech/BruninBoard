@@ -17,7 +17,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
     private var heightConstraint: NSLayoutConstraint!
 
     private var topBarVisible = false
-    private var editing = false
+    private var isEditMode = false
 
     private var currentSuggestions: [String] = []
     private var undoStack: [UndoRecord] = []
@@ -69,7 +69,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         super.viewDidLayoutSubviews()
         let b = view.bounds
         root.frame = b
-        if editing {
+        if isEditMode {
             editView.frame = b
         } else {
             let barH = topBarVisible ? barHeight : 0
@@ -89,7 +89,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         let screen = UIScreen.main.bounds
         let landscape = screen.width > screen.height
         let keysHeight: CGFloat = landscape ? 160 : 218
-        let extra: CGFloat = (topBarVisible || editing) ? barHeight : 0
+        let extra: CGFloat = (topBarVisible || isEditMode) ? barHeight : 0
         heightConstraint.constant = keysHeight + extra
         view.setNeedsLayout()
     }
@@ -109,7 +109,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
             guard let self = self else { return }
             self.haptics.tap()
             switch tool {
-            case .textEdit: self.setEditing(true)
+            case .textEdit: self.setEditMode(true)
             case .clipboard: self.pasteClipboard()
             case .settings: self.openHostApp()
             case .translate: self.translateCurrentLine()
@@ -132,8 +132,8 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         updateSuggestions()
     }
 
-    private func setEditing(_ on: Bool) {
-        editing = on
+    private func setEditMode(_ on: Bool) {
+        isEditMode = on
         editView.isHidden = !on
         keyboardView.isHidden = on
         topBar.isHidden = on || !topBarVisible
@@ -289,7 +289,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
     // MARK: Suggestions
 
     private func updateSuggestions() {
-        guard topBarVisible, !editing, !topBar.showingTools else { return }
+        guard topBarVisible, !isEditMode, !topBar.showingTools else { return }
         let before = proxy.documentContextBeforeInput ?? ""
         let word = SuggestionEngine.currentWord(in: before)
         guard !word.isEmpty else {
@@ -437,7 +437,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         case .select, .selectAll:
             break   // the public keyboard API cannot create a text selection
         case .close:
-            setEditing(false)
+            setEditMode(false)
         }
     }
 }
