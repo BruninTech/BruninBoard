@@ -1,8 +1,8 @@
 import UIKit
 
-enum BarTool { case textEdit, clipboard, settings, translate }
+enum BarTool { case textEdit, settings, translate }
 
-/// Gboard-style bar: [grid] [3 suggestions | 4 tool icons] [undo]
+/// Gboard-style bar: [grid] [3 suggestions | tool icons] [undo]
 final class TopBarView: UIView {
     var onGrid: (() -> Void)?
     var onSuggestion: ((Int) -> Void)?
@@ -20,13 +20,14 @@ final class TopBarView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = Theme.background
 
-        style(circle: gridButton, symbol: "square.grid.2x2.fill", square: true)
+        gridButton.setImage(UIImage(systemName: "square.grid.2x2.fill"), for: .normal)
+        gridButton.layer.cornerRadius = 17
         gridButton.addTarget(self, action: #selector(gridTapped), for: .touchUpInside)
         addSubview(gridButton)
 
-        style(circle: undoButton, symbol: "arrow.uturn.backward", square: false)
+        undoButton.setImage(UIImage(systemName: "arrow.uturn.backward"), for: .normal)
+        undoButton.layer.cornerRadius = 17
         undoButton.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
         addSubview(undoButton)
 
@@ -34,7 +35,6 @@ final class TopBarView: UIView {
             let b = UIButton(type: .system)
             b.titleLabel?.font = .systemFont(ofSize: 17)
             b.titleLabel?.lineBreakMode = .byTruncatingTail
-            b.setTitleColor(Theme.text, for: .normal)
             b.tag = i
             b.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
             addSubview(b)
@@ -42,34 +42,38 @@ final class TopBarView: UIView {
         }
         for _ in 0..<2 {
             let d = UIView()
-            d.backgroundColor = Theme.hint
             addSubview(d)
             dividers.append(d)
         }
 
         let tools: [(BarTool, String)] = [
             (.textEdit, "character.cursor.ibeam"),
-            (.clipboard, "doc.on.clipboard"),
             (.settings, "gearshape.fill"),
             (.translate, "character.bubble")
         ]
         for (tool, symbol) in tools {
             let b = UIButton(type: .system)
             b.setImage(UIImage(systemName: symbol), for: .normal)
-            b.tintColor = Theme.text
             b.addAction(UIAction { [weak self] _ in self?.onTool?(tool) }, for: .touchUpInside)
             addSubview(b)
             toolButtons.append((tool, b))
         }
+        applyTheme()
         setShowingTools(false)
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    private func style(circle b: UIButton, symbol: String, square: Bool) {
-        b.setImage(UIImage(systemName: symbol), for: .normal)
-        b.tintColor = Theme.text
-        b.backgroundColor = square ? .clear : Theme.fill(.special, pressed: false)
-        b.layer.cornerRadius = 17
+    func applyTheme() {
+        backgroundColor = Theme.background
+        gridButton.tintColor = Theme.onBackground
+        undoButton.tintColor = Theme.palette.specialText
+        undoButton.backgroundColor = Theme.fill(.special, pressed: false)
+        suggestionButtons.forEach {
+            $0.setTitleColor(Theme.onBackground, for: .normal)
+            $0.setTitleColor(Theme.barHint, for: .disabled)
+        }
+        dividers.forEach { $0.backgroundColor = Theme.barHint }
+        toolButtons.forEach { $0.1.tintColor = Theme.onBackground }
     }
 
     // MARK: API

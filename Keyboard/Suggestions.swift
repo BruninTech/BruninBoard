@@ -40,7 +40,14 @@ final class SuggestionEngine {
         for c in before.reversed() {
             if c.isLetter || c == "'" || c == "’" { chars.append(c) } else { break }
         }
+        // A leading apostrophe is a quote mark, not part of the word.
+        while let f = chars.last, f == "'" || f == "’" { chars.removeLast() }
         return String(chars.reversed())
+    }
+
+    /// Contact names and other words from the supplementary lexicon (used by swipe typing).
+    var lexiconWordList: [String] {
+        Array(lexiconWords.filter { w in w.allSatisfy { $0.isLetter || $0 == "'" || $0 == "’" } })
     }
 
     private func isMisspelled(_ word: String, language: String) -> Bool {
@@ -91,6 +98,7 @@ final class SuggestionEngine {
         guard word.count >= 2, word.rangeOfCharacter(from: .decimalDigits) == nil else { return nil }
         if word.count > 1 && word == word.uppercased() { return nil }          // acronyms
         if lexiconWords.contains(word) { return nil }
+        if word.hasSuffix("'") || word.hasSuffix("’") { return nil }
         let langs = languages
         guard langs.allSatisfy({ isMisspelled(word, language: $0) }) else { return nil }
 

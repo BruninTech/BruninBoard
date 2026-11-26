@@ -9,8 +9,9 @@ enum KeyKind: Equatable {
     case page(Page)
     case space
     case ret
-    case emoji      // tap: next keyboard, swipe up: toggle top bar, hold: comma
-    case globe
+    /// Multi-function key left of the space bar:
+    /// tap = ",", long-press = next keyboard, swipe up/down = toggle the top bar.
+    case comma
     case spacer
 }
 
@@ -25,7 +26,7 @@ struct KeySpec {
 
     var style: KeyStyle {
         switch kind {
-        case .char, .space: return .normal
+        case .char, .space, .comma: return .normal
         case .ret: return .accent
         default: return .special
         }
@@ -35,6 +36,7 @@ struct KeySpec {
         KeySpec(kind: .char, label: c, output: c, hint: hint, weight: weight)
     }
     static func spacer(_ w: CGFloat) -> KeySpec { KeySpec(kind: .spacer, weight: w) }
+    static func comma() -> KeySpec { KeySpec(kind: .comma, label: ",", output: ",") }
 }
 
 enum Layouts {
@@ -51,6 +53,14 @@ enum Layouts {
             .joined(separator: " · ")
     }
 
+    private static func space() -> KeySpec {
+        KeySpec(kind: .space, label: spaceLabel(), output: " ", weight: 5)
+    }
+
+    private static func ret() -> KeySpec {
+        KeySpec(kind: .ret, label: "↵", output: "\n", weight: 1.5)
+    }
+
     static func rows(for page: Page) -> [[KeySpec]] {
         let backspace = KeySpec(kind: .backspace, label: "⌫", weight: 1.5)
         switch page {
@@ -65,11 +75,10 @@ enum Layouts {
                 + [backspace]
             let r4: [KeySpec] = [
                 KeySpec(kind: .page(.symbols1), label: "?123", weight: 1.5),
-                KeySpec(kind: .emoji, label: "☺", weight: 1),
-                KeySpec(kind: .globe, label: "🌐", weight: 1),
-                KeySpec(kind: .space, label: spaceLabel(), output: " ", weight: 4),
+                .comma(),
+                space(),
                 .char("."),
-                KeySpec(kind: .ret, label: "↵", output: "\n", weight: 1.5)
+                ret()
             ]
             return [r1, r2, r3, r4]
 
@@ -80,11 +89,10 @@ enum Layouts {
                 + chars("*\"':;!?") + [backspace]
             let r4: [KeySpec] = [
                 KeySpec(kind: .page(.letters), label: "ABC", weight: 1.5),
-                .char(","),
-                KeySpec(kind: .emoji, label: "☺", weight: 1),
-                KeySpec(kind: .space, label: spaceLabel(), output: " ", weight: 4),
+                .comma(),
+                space(),
                 .char("."),
-                KeySpec(kind: .ret, label: "↵", output: "\n", weight: 1.5)
+                ret()
             ]
             return [r1, r2, r3, r4]
 
@@ -96,10 +104,9 @@ enum Layouts {
             let r4: [KeySpec] = [
                 KeySpec(kind: .page(.letters), label: "ABC", weight: 1.5),
                 .char("<"),
-                KeySpec(kind: .emoji, label: "☺", weight: 1),
-                KeySpec(kind: .space, label: spaceLabel(), output: " ", weight: 4),
+                space(),
                 .char(">"),
-                KeySpec(kind: .ret, label: "↵", output: "\n", weight: 1.5)
+                ret()
             ]
             return [r1, r2, r3, r4]
         }

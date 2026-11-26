@@ -13,25 +13,27 @@ enum EditAction {
 final class TextEditView: UIView {
     var onAction: ((EditAction) -> Void)?
 
-    private var buttons: [(EditAction, UIButton)] = []
+    private struct PadButton {
+        let action: EditAction
+        let button: UIButton
+        let enabled: Bool
+    }
+
+    private var buttons: [PadButton] = []
     private let titleLabel = UILabel()
     private let backButton = UIButton(type: .system)
     private var repeatTimer: Timer?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = Theme.background
 
         backButton.setImage(UIImage(systemName: "arrow.left"), for: .normal)
-        backButton.tintColor = Theme.text
-        backButton.backgroundColor = Theme.fill(.special, pressed: false)
         backButton.layer.cornerRadius = 17
         backButton.addAction(UIAction { [weak self] _ in self?.onAction?(.close) }, for: .touchUpInside)
         addSubview(backButton)
 
         titleLabel.text = "Text editing"
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textColor = Theme.text
         addSubview(titleLabel)
 
         let defs: [(EditAction, String, Bool)] = [
@@ -43,33 +45,42 @@ final class TextEditView: UIView {
         ]
         for (action, label, enabled) in defs {
             let b = UIButton(type: .system)
-            if UIImage(systemName: label) != nil {
-                b.setImage(UIImage(systemName: label), for: .normal)
+            if let image = UIImage(systemName: label) {
+                b.setImage(image, for: .normal)
             } else {
                 b.setTitle(label, for: .normal)
                 b.titleLabel?.font = .systemFont(ofSize: 14)
             }
-            b.tintColor = Theme.hint
-            b.setTitleColor(enabled ? Theme.text : Theme.hint, for: .normal)
-            b.backgroundColor = Theme.fill(enabled ? .normal : .special, pressed: false)
             b.layer.cornerRadius = 8
-            b.alpha = enabled ? 1 : 0.55
-            if action == .left || action == .right || action == .up || action == .down || action == .backspace {
+            if [.left, .right, .up, .down, .backspace].contains(action) {
                 b.addTarget(self, action: #selector(repeatDown(_:)), for: .touchDown)
                 b.addTarget(self, action: #selector(repeatUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
             } else {
                 b.addAction(UIAction { [weak self] _ in self?.onAction?(action) }, for: .touchUpInside)
             }
             addSubview(b)
-            buttons.append((action, b))
+            buttons.append(PadButton(action: action, button: b, enabled: enabled))
         }
+        applyTheme()
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    private func action(for b: UIButton) -> EditAction? { buttons.first { $0.1 === b }?.0 }
+    func applyTheme() {
+        backgroundColor = Theme.background
+        backButton.tintColor = Theme.palette.specialText
+        backButton.backgroundColor = Theme.fill(.special, pressed: false)
+        titleLabel.textColor = Theme.onBackground
+        for pb in buttons {
+            let color = pb.enabled ? Theme.textColor(for: .normal) : Theme.hint
+            pb.button.tintColor = color
+            pb.button.setTitleColor(color, for: .normal)
+            pb.button.backgroundColor = Theme.fill(pb.enabled ? .normal : .special, pressed: false)
+            pb.button.alpha = pb.enabled ? 1 : 0.55
+        }
+    }
 
     @objc private func repeatDown(_ b: UIButton) {
-        guard let a = action(for: b) else { return }
+        guard let a = buttons.first(where: { $0.button === b })?.action else { return }
         onAction?(a)
         repeatTimer?.invalidate()
         repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
@@ -116,6 +127,6 @@ final class TextEditView: UIView {
             .end: rect(2, 3),
             .backspace: rect(3, 3)
         ]
-        for (a, b) in buttons { if let r = place[a] { b.frame = r } }
+        for pb in buttons { if let r = place[pb.action] { pb.button.frame = r } }
     }
 }

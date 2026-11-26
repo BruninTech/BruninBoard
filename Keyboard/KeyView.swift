@@ -1,36 +1,41 @@
 import UIKit
 
+/// Reads the palette chosen in the settings app. Call `reload()` when the keyboard appears.
 enum Theme {
-    static let background = UIColor { $0.userInterfaceStyle == .dark
-        ? UIColor(red: 0.02, green: 0.02, blue: 0.02, alpha: 1)
-        : UIColor(red: 0.82, green: 0.84, blue: 0.86, alpha: 1) }
+    private(set) static var palette = ThemePalette.current()
+
+    static func reload() { palette = ThemePalette.current() }
+
+    static var background: UIColor { palette.background }
+    static var onBackground: UIColor { palette.onBackground }
+    static var accent: UIColor { palette.accent }
+    static var hint: UIColor { palette.text.withAlphaComponent(0.55) }
+    static var barHint: UIColor { palette.onBackground.withAlphaComponent(0.4) }
 
     static func fill(_ style: KeyStyle, pressed: Bool) -> UIColor {
-        UIColor { t in
-            let dark = t.userInterfaceStyle == .dark
-            switch (style, pressed) {
-            case (.normal, false):  return dark ? UIColor(white: 0.23, alpha: 1) : .white
-            case (.normal, true):   return dark ? UIColor(white: 0.36, alpha: 1) : UIColor(white: 0.85, alpha: 1)
-            case (.special, false): return dark ? UIColor(white: 0.13, alpha: 1) : UIColor(white: 0.68, alpha: 1)
-            case (.special, true):  return dark ? UIColor(white: 0.30, alpha: 1) : UIColor(white: 0.85, alpha: 1)
-            case (.accent, false):  return UIColor(red: 0.49, green: 0.84, blue: 0.78, alpha: 1)
-            case (.accent, true):   return UIColor(red: 0.38, green: 0.72, blue: 0.67, alpha: 1)
-            }
+        switch (style, pressed) {
+        case (.normal, false): return palette.key
+        case (.normal, true): return palette.keyPressed
+        case (.special, false): return palette.special
+        case (.special, true): return palette.specialPressed
+        case (.accent, false): return palette.accent
+        case (.accent, true): return palette.accentPressed
         }
     }
 
-    static let text = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
-    static let hint = UIColor { $0.userInterfaceStyle == .dark
-        ? UIColor(white: 1, alpha: 0.55) : UIColor(white: 0, alpha: 0.45) }
-    static let accentGlyph = UIColor(red: 0.04, green: 0.2, blue: 0.18, alpha: 1)
-    static let bar = UIColor { $0.userInterfaceStyle == .dark
-        ? UIColor(white: 0.16, alpha: 1) : UIColor(white: 0.74, alpha: 1) }
+    static func textColor(for style: KeyStyle) -> UIColor {
+        switch style {
+        case .normal: return palette.text
+        case .special: return palette.specialText
+        case .accent: return palette.accentGlyph
+        }
+    }
 }
 
 final class KeyView: UIView {
     var spec: KeySpec { didSet { refresh() } }
-    var isPressed = false { didSet { updateFill() } }
-    var isActive = false { didSet { updateFill() } }   // e.g. shift on / caps
+    var isPressed = false { didSet { updateColors() } }
+    var isActive = false { didSet { updateColors() } }   // shift on / caps
 
     private let titleLabel = UILabel()
     private let hintLabel = UILabel()
@@ -43,7 +48,6 @@ final class KeyView: UIView {
 
         titleLabel.textAlignment = .center
         hintLabel.font = .systemFont(ofSize: 9)
-        hintLabel.textColor = Theme.hint
         hintLabel.textAlignment = .right
         addSubview(titleLabel)
         addSubview(hintLabel)
@@ -52,32 +56,28 @@ final class KeyView: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Re-applies text, fonts and colours (also used after a theme change).
     func refresh() {
         titleLabel.text = spec.label
         hintLabel.text = spec.hint
+        hintLabel.textColor = Theme.hint
         switch spec.kind {
-        case .char:
+        case .char, .comma, .ret, .shift, .backspace:
             titleLabel.font = .systemFont(ofSize: 22)
         case .space:
             titleLabel.font = .systemFont(ofSize: 11)
-        case .emoji, .globe:
-            titleLabel.font = .systemFont(ofSize: 18)
-        case .ret, .shift, .backspace:
-            titleLabel.font = .systemFont(ofSize: 22)
         default:
             titleLabel.font = .systemFont(ofSize: 15)
         }
-        titleLabel.textColor = spec.style == .accent ? Theme.accentGlyph : Theme.text
-        updateFill()
+        updateColors()
         setNeedsLayout()
     }
 
-    private func updateFill() {
-        if spec.kind == .shift && isActive {
-            backgroundColor = Theme.fill(.normal, pressed: isPressed)
-        } else {
-            backgroundColor = Theme.fill(spec.style, pressed: isPressed)
-        }
+    private func updateColors() {
+        // An active shift key is drawn like a normal (light) key.
+        let style: KeyStyle = (spec.kind == .shift && isActive) ? .normal : spec.style
+        backgroundColor = Theme.fill(style, pressed: isPressed)
+        titleLabel.textColor = Theme.textColor(for: style)
     }
 
     override func layoutSubviews() {
@@ -88,7 +88,6 @@ final class KeyView: UIView {
 
     override func traitCollectionDidChange(_ previous: UITraitCollection?) {
         super.traitCollectionDidChange(previous)
-        updateFill()
-        titleLabel.textColor = spec.style == .accent ? Theme.accentGlyph : Theme.text
+        updateColors()
     }
 }
