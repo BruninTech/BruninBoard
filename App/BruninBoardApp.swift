@@ -30,6 +30,32 @@ struct SettingsView: View {
 
     private static let langs = ["en", "pt", "es", "fr", "de", "it", "ja", "ru"]
 
+    private struct LanguageOption: Identifiable {
+        let id: String      // UITextChecker code, e.g. en_US
+        let name: String
+    }
+
+    private static let languageOptions = [
+        LanguageOption(id: "en_US", name: "English"),
+        LanguageOption(id: "pt_BR", name: "Português (Brasil)"),
+        LanguageOption(id: "es_ES", name: "Español"),
+        LanguageOption(id: "fr_FR", name: "Français"),
+        LanguageOption(id: "de_DE", name: "Deutsch"),
+        LanguageOption(id: "it_IT", name: "Italiano")
+    ]
+
+    @State private var activeLangs = Settings.languages
+
+    /// Keeps at least one language selected.
+    private func toggleLanguage(_ code: String) {
+        if let i = activeLangs.firstIndex(of: code) {
+            if activeLangs.count > 1 { activeLangs.remove(at: i) }
+        } else {
+            activeLangs.append(code)
+        }
+        Settings.languages = activeLangs
+    }
+
     private var previewPalette: ThemePalette {
         ThemePalette.resolve(preset: preset,
                              customBackground: UIColor(customBg),
@@ -82,6 +108,23 @@ struct SettingsView: View {
                         .onChange(of: autoSpace) { Settings.autoSpacePunctuation = $0 }
                     Toggle("Show top bar by default", isOn: $topBar)
                         .onChange(of: topBar) { Settings.showTopBarOnLaunch = $0 }
+                }
+
+                Section(header: Text("Typing languages"),
+                        footer: Text("Used for autocorrect, suggestions and swipe typing. Choose one for the cleanest results; selecting several mixes their dictionaries.")) {
+                    ForEach(Self.languageOptions) { opt in
+                        Button {
+                            toggleLanguage(opt.id)
+                        } label: {
+                            HStack {
+                                Text(opt.name).foregroundColor(.primary)
+                                Spacer()
+                                if activeLangs.contains(opt.id) {
+                                    Image(systemName: "checkmark").foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Section(header: Text("Gestures"),
@@ -167,7 +210,7 @@ struct ThemePreview: View {
                     .frame(width: 52, height: 34)
                     .background(Color(palette.special))
                     .cornerRadius(6)
-                Text("EN · PT")
+                Text("EN")
                     .font(.system(size: 11))
                     .foregroundColor(Color(palette.text))
                     .frame(maxWidth: .infinity, minHeight: 34)

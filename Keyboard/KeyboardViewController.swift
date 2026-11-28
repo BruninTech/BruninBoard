@@ -37,6 +37,8 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
     private var swipeInserted: String?
     private var swipeAlternatives: [String] = []
     private var lastSwipeTime = Date.distantPast
+    private var swipeLive = false
+    private var liveDecodeBusy = false
 
     // Trackpad / cursor pad
     private var cursorModel: CursorModel?
@@ -453,6 +455,31 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         }
     }
 
+    /// Live preview: while the finger is still down, show the current best match in the centre slot.
+    func keyboard(_ kb: KeyboardView, swipeProgress input: SwipeInput) {
+        guard topBarVisible, !topBar.showingTools, !isEditMode, !liveDecodeBusy else { return }
+        swipeLive = true
+        liveDecodeBusy = true
+        decoder.decode(input, languages: Settings.languages) { [weak self] words, _ in
+            guard let self = self else { return }
+            self.liveDecodeBusy = false
+            guard self.swipeLive, !words.isEmpty else { return }
+            let shift = self.keyboardView.shiftState
+            self.topBar.setSuggestions(self.centered(words.map { self.cased($0, shift) }), highlight: 1)
+        }
+    }
+
+    func keyboardSwipeEnded(_ kb: KeyboardView) {
+        swipeLive = false
+        updateSuggestions()
+    }
+
+    /// [runner-up, best, third]: the best match sits in the highlighted centre slot.
+    private func centered(_ w: [String]) -> [String] {
+        guard let best = w.first else { return [] }
+        return [w.count > 1 ? w[1] : "", best, w.count > 2 ? w[2] : ""]
+    }
+
     private func cased(_ w: String, _ shift: ShiftState) -> String {
         switch shift {
         case .off: return w
@@ -474,7 +501,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         proxy.insertText(prefix + primary + " ")
         undoStack = [UndoRecord(deleteCount: prefix.count + primary.count + 1, restore: "", learn: nil)]
         swipeInserted = primary
-        swipeAlternatives = words
+        swipeAlternatives = centered(words)
         lastSwipeTime = Date()
         lastInputTime = Date()
         updateAutoShift()
@@ -491,7 +518,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
         if let inserted = swipeInserted {
             if before.hasSuffix(inserted + " ") {
                 currentSuggestions = swipeAlternatives
-                topBar.setSuggestions(currentSuggestions)
+                topBar.setSuggestions(currentSuggestions, highlight: 1)
                 return
             }
             swipeInserted = nil
@@ -503,8 +530,17 @@ final class KeyboardViewController: UIInputViewController, KeyboardViewDelegate 
             topBar.setSuggestions([])
             return
         }
-        currentSuggestions = [word] + engine.suggestions(for: word)
-        topBar.setSuggestions(currentSuggestions)
+        // Slot 1: exactly what you typed (tap it to keep it and stop autocorrect).
+        // Slot 2 (highlighted): what space will correct it to, or the best prediction.
+        // Slot 3: the next prediction.
+        var alternatives = engine.suggestions(for: word, limit: 3)
+        let auto = engine.shortcut(for: word) ?? (Settings.autoCorrect ? engine.autocorrection(for: word) : nil)
+        if let a = auto, a != word {
+            alternatives.removeAll { $0.lowercased() == a.lowercased() }
+            alternatives.insert(a, at: 0)
+        }
+        currentSuggestions = [word] + Array(alternatives.prefix(2))
+        topBar.setSuggestions(currentSuggestions, highlight: currentSuggestions.count > 1 ? 1 : nil)
     }
 
     private func pickSuggestion(_ index: Int) {

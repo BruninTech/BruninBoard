@@ -17,6 +17,7 @@ final class TopBarView: UIView {
 
     private(set) var showingTools = false
     private var titles: [String] = ["", "", ""]
+    private var highlightIndex: Int?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -36,6 +37,7 @@ final class TopBarView: UIView {
             b.titleLabel?.font = .systemFont(ofSize: 17)
             b.titleLabel?.lineBreakMode = .byTruncatingTail
             b.tag = i
+            b.layer.cornerRadius = 8
             b.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
             addSubview(b)
             suggestionButtons.append(b)
@@ -74,16 +76,28 @@ final class TopBarView: UIView {
         }
         dividers.forEach { $0.backgroundColor = Theme.barHint }
         toolButtons.forEach { $0.1.tintColor = Theme.onBackground }
+        refreshHighlight()
+    }
+
+    /// The highlighted slot (the autocorrect candidate) gets a key-coloured pill, like SwiftKey / Gboard.
+    private func refreshHighlight() {
+        for (i, b) in suggestionButtons.enumerated() {
+            let on = i == highlightIndex && !titles[i].isEmpty
+            b.backgroundColor = on ? Theme.fill(.normal, pressed: false) : .clear
+            b.setTitleColor(on ? Theme.textColor(for: .normal) : Theme.onBackground, for: .normal)
+        }
     }
 
     // MARK: API
 
-    func setSuggestions(_ s: [String]) {
+    func setSuggestions(_ s: [String], highlight: Int? = nil) {
         titles = (0..<3).map { $0 < s.count ? s[$0] : "" }
+        highlightIndex = highlight
         for (i, b) in suggestionButtons.enumerated() {
             b.setTitle(titles[i], for: .normal)
             b.isEnabled = !titles[i].isEmpty
         }
+        refreshHighlight()
     }
 
     func setShowingTools(_ tools: Bool) {
@@ -94,11 +108,12 @@ final class TopBarView: UIView {
     }
 
     func setBusyMessage(_ text: String?) {
-        guard let text = text else { setSuggestions(titles); return }
+        guard let text = text else { setSuggestions(titles, highlight: highlightIndex); return }
         setShowingTools(false)
         for (i, b) in suggestionButtons.enumerated() {
             b.setTitle(i == 1 ? text : "", for: .normal)
             b.isEnabled = false
+            b.backgroundColor = .clear
         }
     }
 
@@ -116,7 +131,7 @@ final class TopBarView: UIView {
         let midW = w - 2 * midX
         let sw = midW / 3
         for (i, b) in suggestionButtons.enumerated() {
-            b.frame = CGRect(x: midX + CGFloat(i) * sw, y: 0, width: sw, height: h)
+            b.frame = CGRect(x: midX + CGFloat(i) * sw + 3, y: 4, width: sw - 6, height: h - 8)
         }
         for (i, d) in dividers.enumerated() {
             d.frame = CGRect(x: midX + CGFloat(i + 1) * sw, y: h * 0.25, width: 0.5, height: h * 0.5)

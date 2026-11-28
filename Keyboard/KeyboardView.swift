@@ -10,6 +10,10 @@ protocol KeyboardViewDelegate: AnyObject {
     /// Vertical swipe on the comma key.
     func keyboard(_ kb: KeyboardView, didSwipe key: KeySpec)
     func keyboard(_ kb: KeyboardView, didSwipeType input: SwipeInput)
+    /// Called a few times per second while a swipe is still in progress (for the live preview).
+    func keyboard(_ kb: KeyboardView, swipeProgress input: SwipeInput)
+    /// The swipe finished or was cancelled (a final didSwipeType / didTap may follow).
+    func keyboardSwipeEnded(_ kb: KeyboardView)
     func keyboardTrackpadBegan(_ kb: KeyboardView)
     func keyboard(_ kb: KeyboardView, moveCursorByCharacters chars: Int, lines: Int)
     func keyboardTrackpadEnded(_ kb: KeyboardView)
@@ -56,6 +60,7 @@ final class KeyboardView: UIView {
     }
     private var states: [UITouch: TouchState] = [:]
     private var trackpadTouch: UITouch?
+    private var lastProgressTime = Date.distantPast
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -292,7 +297,10 @@ final class KeyboardView: UIView {
             st.cancelTimers()
             st.keyView.isPressed = false
             if st.isTrackpad { endTrackpad() }
-            if st.isSwiping { fadeTrail() }
+            if st.isSwiping {
+                fadeTrail()
+                delegate?.keyboardSwipeEnded(self)
+            }
         }
     }
 
@@ -357,10 +365,21 @@ final class KeyboardView: UIView {
         if let last = st.points.last, hypot(p.x - last.x, p.y - last.y) < 2 { return }
         st.points.append(p)
         updateTrail(st.points)
+
+        // Live preview: at most ~14 decodes per second, and only once the path is long enough to mean something.
+        let now = Date()
+        let kw = st.keyView.frame.width
+        if now.timeIntervalSince(lastProgressTime) > 0.07,
+           st.points.count >= 4, SwipeDecoder.length(st.points) > kw * 1.2 {
+            lastProgressTime = now
+            delegate?.keyboard(self, swipeProgress: SwipeInput(points: st.points,
+                                                               centers: letterCenters(), keyWidth: kw))
+        }
     }
 
     private func finishSwipe(_ st: TouchState, end p: CGPoint) {
         fadeTrail()
+        delegate?.keyboardSwipeEnded(self)
         var pts = st.points
         if let last = pts.last, hypot(p.x - last.x, p.y - last.y) >= 2 { pts.append(p) }
         let kw = st.keyView.frame.width

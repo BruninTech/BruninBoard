@@ -14,7 +14,7 @@ final class SuggestionEngine {
         let dashed = Settings.languages
             .map { $0.replacingOccurrences(of: "_", with: "-") }
             .filter { available.contains($0) }
-        return dashed.isEmpty ? [available.first ?? "en_US"] : dashed
+        return dashed.isEmpty ? [Settings.languages.first ?? "en_US"] : dashed
     }
 
     // MARK: Lexicon

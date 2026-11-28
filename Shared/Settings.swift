@@ -42,7 +42,7 @@ enum Settings {
 
     /// Language codes for UITextChecker, e.g. "en_US", "pt_BR".
     static var languages: [String] {
-        get { defaults.stringArray(forKey: "languages") ?? ["en_US", "pt_BR"] }
+        get { defaults.stringArray(forKey: "languages") ?? ["en_US"] }
         set { defaults.set(newValue, forKey: "languages") }
     }
 
